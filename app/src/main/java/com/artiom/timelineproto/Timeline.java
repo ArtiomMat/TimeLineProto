@@ -8,6 +8,7 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.util.Log;
 import android.util.TypedValue;
+import android.view.MotionEvent;
 import android.view.View;
 
 import androidx.core.content.ContextCompat;
@@ -21,40 +22,6 @@ import java.util.concurrent.ThreadLocalRandom;
 
 @SuppressLint({"ViewConstructor"})
 public class Timeline extends View {
-
-    public static final float MOMENT_RADIUS = 30;
-
-    // TODO:
-    /*
-        // Step 1: Create a white circle drawable
-        ShapeDrawable whiteCircle = new ShapeDrawable(new OvalShape());
-        whiteCircle.getPaint().setColor(Color.WHITE);
-
-        // Step 2: Cache the white circle drawable
-
-        // You can store the white circle drawable as a class member or use any caching mechanism like LruCache or HashMap.
-
-        // Step 3: Tint the cached drawable
-        Drawable cachedDrawable = whiteCircle.getConstantState().newDrawable().mutate();
-        cachedDrawable.setColorFilter(color, PorterDuff.Mode.SRC_IN);
-
-        // 'color' should be the desired color you want to apply to the circle.
-
-        // Now you can use the 'cachedDrawable' to draw the colored circle on the canvas using the drawCircle() method.
-
-        // Example usage:
-        canvas.drawCircle(centerX, centerY, radius, cachedDrawable);
-     */
-
-    private final View parentView;
-    private final ArrayList<Moment> moments;
-
-    private Bitmap timelineBitmap; // We cache the timeline as it doesn't move.
-    private final Paint paint;
-    Canvas timelineCanvas;
-
-    public int inactiveTimelineColor;
-
     // A moment literally represents a moment in time.
     // Usually a more suitable name would be task.
     public class Moment implements Comparable<Moment> {
@@ -124,6 +91,40 @@ public class Timeline extends View {
         }
     }
 
+    // TODO:
+    /*
+        // Step 1: Create a white circle drawable
+        ShapeDrawable whiteCircle = new ShapeDrawable(new OvalShape());
+        whiteCircle.getPaint().setColor(Color.WHITE);
+
+        // Step 2: Cache the white circle drawable
+
+        // You can store the white circle drawable as a class member or use any caching mechanism like LruCache or HashMap.
+
+        // Step 3: Tint the cached drawable
+        Drawable cachedDrawable = whiteCircle.getConstantState().newDrawable().mutate();
+        cachedDrawable.setColorFilter(color, PorterDuff.Mode.SRC_IN);
+
+        // 'color' should be the desired color you want to apply to the circle.
+
+        // Now you can use the 'cachedDrawable' to draw the colored circle on the canvas using the drawCircle() method.
+
+        // Example usage:
+        canvas.drawCircle(centerX, centerY, radius, cachedDrawable);
+     */
+
+    public static final float MOMENT_RADIUS = 40;
+
+    private final View parentView;
+    private final ArrayList<Moment> moments;
+
+    private Bitmap timelineBitmap; // We cache the timeline as it doesn't move.
+    private final Paint linePaint, momentPaint;
+    Canvas timelineCanvas;
+
+    public int inactiveTimelineColor;
+    public int firstVisibleMoment = -1, lastVisibleMoment = -1;
+
     // So we order the list.
     void onMomentsTimeUpdated() {
         Collections.sort(moments);
@@ -144,15 +145,86 @@ public class Timeline extends View {
         this.moments = new ArrayList<>();
         this.parentView = parentView;
 
-        paint = new Paint();
-        paint.setStyle(Paint.Style.STROKE);
-        paint.setStrokeWidth(20f);
+        linePaint = new Paint();
+        momentPaint = new Paint();
 
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(30f);
+        paint.setShadowLayer(10f, 0f, 0f, Color.BLACK);
+
+        paint.setStyle(Paint.Style.FILL);
+
+        // Use hardware rendering
         setLayerType(View.LAYER_TYPE_HARDWARE, null);
+    }
+
+    @Override
+    public boolean performClick() {
+//        Log.d("performClick", "OMG CLICK!");
+        // Handle the click event here
+        // Perform any necessary actions
+        return super.performClick();
+    }
+
+    private int touchedMomentIndex = -1;
+    @Override
+    public boolean onTouchEvent(MotionEvent event) {
+        int action = event.getAction();
+        float touchX = event.getX();
+
+        switch (action) {
+            case MotionEvent.ACTION_DOWN: // Finger just pressed the screen
+                Log.d("performClick", "MotionEvent.ACTION_DOWN");
+                // -1 indicates nothing is visible
+                if (firstVisibleMoment == -1) {
+                    Log.d("performClick", "Nothing visible ");
+                    break;
+                }
+
+                // Loop through all moments visible and find the one being touched
+                for (int i = firstVisibleMoment; i <= lastVisibleMoment; i++) {
+                    float momentX = calcPosX(moments.get(i));
+
+                    // Checks if within range of the moment
+                    if (touchX < momentX + MOMENT_RADIUS && touchX > momentX - MOMENT_RADIUS) {
+                        touchedMomentIndex = i;
+                        Log.d("performClick", "Selected "+i);
+                        break;
+                    }
+                }
+                break;
+            case MotionEvent.ACTION_MOVE: // Finger is moving on the screen
+//                Log.d("performClick", "OMG MOVE!");
+                // touchedMomentIndex = -1 indicates that no moment was even touched, the user is just fucking moving their finger...
+                if (touchedMomentIndex == -1)
+                    break;
+
+                moments.get(touchedMomentIndex).t = calcT((int) touchX);
+                invalidate();
+
+                break;
+            case MotionEvent.ACTION_UP: // Finger just released the screen
+                // Sort the moments again.
+                if (touchedMomentIndex > -1)
+                    onMomentsTimeUpdated();
+
+                touchedMomentIndex = -1;
+                performClick();
+                break;
+
+            default:
+                return super.onTouchEvent(event);
+        }
+
+        return true;
     }
 
     float calcPosX(Moment moment) {
         return ((moment.t - MainActivity.timeStart) / MainActivity.timeScale) * getWidth();
+    }
+
+    int calcT(int x) {
+        return (int) ((x*1.0f/getWidth()) * MainActivity.timeScale + MainActivity.timeStart);
     }
 
     // This is here because getWidth and getHeight obviously wont work immidetly
@@ -179,17 +251,6 @@ public class Timeline extends View {
         } else {
             Log.d("onCreate()", "Failed to get theme_color.");
         }
-
-        // Create a cache bitmap after the size is determined
-//        timelineBitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
-//        timelineCanvas = new Canvas(timelineBitmap);
-//
-//        float startY = timelineBitmap.getHeight() / 2f;
-//        float endY = timelineBitmap.getHeight() / 2f;
-//
-//        timelineCanvas.drawLine(0, startY, (float) w, endY, paint);
-
-        paint.setStyle(Paint.Style.FILL);
 
         invalidate();
     }
@@ -218,9 +279,13 @@ public class Timeline extends View {
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
 
+        firstVisibleMoment = -1;
+        lastVisibleMoment = moments.size() - 1;
+
         float posX = calcPosX(moments.get(0)); // Updated to next at the end of the loop so we put it here
         // If already the first one is too far then draw a line to it
         if (posX + MOMENT_RADIUS > 0) {
+            firstVisibleMoment = 0;
             // TODO: Find out how to have a theme dependant deactivated color
             paint.setColor(inactiveTimelineColor);
             canvas.drawLine(0, getHeight() / 2.0f, posX, getHeight() / 2.0f, paint);
@@ -229,6 +294,10 @@ public class Timeline extends View {
 
         for (int i = 0; i < moments.size(); i++) {
             if (posX - MOMENT_RADIUS > getWidth()) { // Above width
+                // Only set lastVisibleMoment to the last visible if there was a first visible
+                if (firstVisibleMoment > -1)
+                    lastVisibleMoment = i - 1;
+
                 if (lastOutsideStatus == -1) {
                     paint.setColor(moments.get(i - 1).color);
                     canvas.drawLine(0, getHeight() / 2.0f, getWidth(), getHeight() / 2.0f, paint);
@@ -248,6 +317,7 @@ public class Timeline extends View {
             else { // Inside
                 // If the last one was below 0 draw it's line
                 if (lastOutsideStatus == -1) {
+                    firstVisibleMoment = i; // This is the first visible!
                     lastOutsideStatus = 0;
                     paint.setColor(moments.get(i - 1).color);
                     canvas.drawLine(0, getHeight() / 2.0f, posX, getHeight() / 2.0f, paint);

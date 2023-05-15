@@ -3,6 +3,7 @@
     <style name="Base.Theme.TimeLineProto" parent="Theme.Material3.DayNight.NoActionBar">
         <item name="inactiveTimelineColor">@color/grey2</item>
 
+        <item name="android:splashScreenTheme">@color/grey0</item>
         <item name="android:background">@color/grey0</item>
         <item name="android:statusBarColor">@color/grey0</item>
         <item name="android:windowLightStatusBar">true</item>
