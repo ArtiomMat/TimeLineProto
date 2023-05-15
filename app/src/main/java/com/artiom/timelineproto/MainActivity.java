@@ -35,8 +35,6 @@ public class MainActivity extends AppCompatActivity {
 
     Timeline tl;
 
-    public static int theme_color = 0;
-
     private void setTimeText(String prefix, TextView timeScaleTextView, float minutes) {
         String text;
 
@@ -126,26 +124,7 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        TypedValue typedValue = new TypedValue();
-        boolean resolved = getTheme().resolveAttribute(R.attr.theme_color, typedValue, true);
-        if (resolved) {
-            if (typedValue.type >= TypedValue.TYPE_FIRST_COLOR_INT && typedValue.type <= TypedValue.TYPE_LAST_COLOR_INT) {
-                // The attribute was resolved to a color value
-                int color = typedValue.data;
-                Log.d("onCreate()", String.valueOf(color));
-                theme_color = color;
-            } else {
-                // The attribute was resolved to a color reference, you need to resolve it to an actual color value
-                int colorRes = typedValue.resourceId;
-                int color = ContextCompat.getColor(this, colorRes);
-                Log.d("onCreate()", String.valueOf(color));
-                theme_color = color;
-            }
-        } else {
-            Log.d("onCreate()", "Failed to get theme_color.");
-        }
-
-        tl = new Timeline(getApplicationContext(), findViewById(android.R.id.content));
+        tl = new Timeline(this, findViewById(android.R.id.content));
         LinearLayout tlLayout = findViewById(R.id.timelineLayout);
         tlLayout.addView(
                 tl,

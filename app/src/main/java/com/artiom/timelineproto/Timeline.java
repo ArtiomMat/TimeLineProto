@@ -53,6 +53,8 @@ public class Timeline extends View {
     private final Paint paint;
     Canvas timelineCanvas;
 
+    public int inactiveTimelineColor;
+
     // A moment literally represents a moment in time.
     // Usually a more suitable name would be task.
     public class Moment implements Comparable<Moment> {
@@ -136,17 +138,17 @@ public class Timeline extends View {
         onMomentsTimeUpdated();
     }
 
+    // NOTE: We need the MainActivity context
     public Timeline(Context context, View parentView) {
         super(context);
         this.moments = new ArrayList<>();
         this.parentView = parentView;
 
-
         paint = new Paint();
         paint.setStyle(Paint.Style.STROKE);
         paint.setStrokeWidth(20f);
 
-        invalidate();
+        setLayerType(View.LAYER_TYPE_HARDWARE, null);
     }
 
     float calcPosX(Moment moment) {
@@ -159,7 +161,24 @@ public class Timeline extends View {
     protected void onSizeChanged(int w, int h, int oldW, int oldH) {
         super.onSizeChanged(w, h, oldW, oldH);
 
-
+        TypedValue typedValue = new TypedValue();
+        boolean resolved = getContext().getTheme().resolveAttribute(R.attr.inactiveTimelineColor, typedValue, true);
+        if (resolved) {
+            if (typedValue.type >= TypedValue.TYPE_FIRST_COLOR_INT && typedValue.type <= TypedValue.TYPE_LAST_COLOR_INT) {
+                // The attribute was resolved to a color value
+                int color = typedValue.data;
+                Log.d("onCreate()", String.valueOf(color));
+                inactiveTimelineColor = color;
+            } else {
+                // The attribute was resolved to a color reference, you need to resolve it to an actual color value
+                int colorRes = typedValue.resourceId;
+                int color = ContextCompat.getColor(getContext(), colorRes);
+                Log.d("onCreate()", String.valueOf(color));
+                inactiveTimelineColor = color;
+            }
+        } else {
+            Log.d("onCreate()", "Failed to get theme_color.");
+        }
 
         // Create a cache bitmap after the size is determined
 //        timelineBitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
@@ -171,6 +190,8 @@ public class Timeline extends View {
 //        timelineCanvas.drawLine(0, startY, (float) w, endY, paint);
 
         paint.setStyle(Paint.Style.FILL);
+
+        invalidate();
     }
 
     // -1 for below 0, 1 for above the width, 0 for nothing.
@@ -192,6 +213,7 @@ public class Timeline extends View {
         return posX;
     }
 
+    // TODO: This is one of the most expensive functions probably, find ways to optimize it to the level of a normal SeekBar.
     @Override
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
@@ -200,7 +222,7 @@ public class Timeline extends View {
         // If already the first one is too far then draw a line to it
         if (posX + MOMENT_RADIUS > 0) {
             // TODO: Find out how to have a theme dependant deactivated color
-            paint.setColor(MainActivity.theme_color);
+            paint.setColor(inactiveTimelineColor);
             canvas.drawLine(0, getHeight() / 2.0f, posX, getHeight() / 2.0f, paint);
         }
         int lastOutsideStatus = 0;
