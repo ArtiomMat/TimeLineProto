@@ -251,8 +251,25 @@ public class Timeline extends View {
                         Snackbar.make(parentView, "Moment overlap!", Snackbar.LENGTH_SHORT).show();
                         moments.get(touchedMomentIndex).t = touchedMomentPreT;
                     }
+                    // We are good, no overlapping...
                     else {
-                        // TODO: sort
+                        Moment backup = moments.get(touchedMomentIndex);
+
+                        // If we moved it back in time then we need one procedure, and another for moving forward
+                        if (touchedMomentReplaceIndex < touchedMomentIndex) {
+                            // Essentially shift all the moments after the moved moment.
+                            for (int i = touchedMomentIndex; i > touchedMomentReplaceIndex; i--)
+                                moments.set(i, moments.get(i-1));
+                            // Put the moved moment in it's place.
+                            moments.set(touchedMomentReplaceIndex, backup);
+                        }
+                        else {
+                            // Essentially shift all the moments before the moved moment.
+                            for (int i = touchedMomentIndex; i < touchedMomentReplaceIndex; i++)
+                                moments.set(i, moments.get(i+1));
+                            // Put the moved moment in it's place.
+                            moments.set(touchedMomentReplaceIndex, backup);
+                        }
                     }
                 }
 
