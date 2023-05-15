@@ -142,20 +142,41 @@ public class Timeline extends View {
     // NOTE: We need the MainActivity context
     public Timeline(Context context, View parentView) {
         super(context);
+
         this.moments = new ArrayList<>();
         this.parentView = parentView;
 
         linePaint = new Paint();
+        linePaint.setStyle(Paint.Style.STROKE);
+        linePaint.setStrokeWidth(30f);
+
         momentPaint = new Paint();
-
-        paint.setStyle(Paint.Style.STROKE);
-        paint.setStrokeWidth(30f);
-        paint.setShadowLayer(10f, 0f, 0f, Color.BLACK);
-
-        paint.setStyle(Paint.Style.FILL);
+        momentPaint.setStyle(Paint.Style.FILL);
+        momentPaint.setShadowLayer(10f, 0f, 0f, Color.BLACK); // Add a shadow
 
         // Use hardware rendering
         setLayerType(View.LAYER_TYPE_HARDWARE, null);
+
+        // Setup the color of an inactive region
+
+        TypedValue typedValue = new TypedValue();
+        boolean resolved = getContext().getTheme().resolveAttribute(R.attr.inactiveTimelineColor, typedValue, true);
+        if (resolved) {
+            if (typedValue.type >= TypedValue.TYPE_FIRST_COLOR_INT && typedValue.type <= TypedValue.TYPE_LAST_COLOR_INT) {
+                // The attribute was resolved to a color value
+                int color = typedValue.data;
+                Log.d("onCreate()", String.valueOf(color));
+                inactiveTimelineColor = color;
+            } else {
+                // The attribute was resolved to a color reference, you need to resolve it to an actual color value
+                int colorRes = typedValue.resourceId;
+                int color = ContextCompat.getColor(getContext(), colorRes);
+                Log.d("onCreate()", String.valueOf(color));
+                inactiveTimelineColor = color;
+            }
+        } else {
+            Log.d("onCreate()", "Failed to get theme_color.");
+        }
     }
 
     @Override
@@ -167,6 +188,14 @@ public class Timeline extends View {
     }
 
     private int touchedMomentIndex = -1;
+    private int touchedMomentPreT = -1;
+    // This is the index of the moment the touched moment finna replace.
+    // This index is used for 2 things:
+    // 1. Checking if the moment overlaps with any other moment.
+    // 2. Re-sorting more efficiently because we know exactly where it wants to go.
+    // Calculation is in the ACTION_MOVE case, where we simply check if we went over of below neighbor.
+    private int touchedMomentReplaceIndex = -1;
+    private boolean touchedMomentOverlap = false;
     @Override
     public boolean onTouchEvent(MotionEvent event) {
         int action = event.getAction();
@@ -187,7 +216,8 @@ public class Timeline extends View {
 
                     // Checks if within range of the moment
                     if (touchX < momentX + MOMENT_RADIUS && touchX > momentX - MOMENT_RADIUS) {
-                        touchedMomentIndex = i;
+                        touchedMomentIndex = touchedMomentReplaceIndex = i;
+                        touchedMomentPreT = moments.get(i).t;
                         Log.d("performClick", "Selected "+i);
                         break;
                     }
@@ -199,14 +229,32 @@ public class Timeline extends View {
                 if (touchedMomentIndex == -1)
                     break;
 
-                moments.get(touchedMomentIndex).t = calcT((int) touchX);
-                invalidate();
+                int newT = calcT((int) touchX);
+                moments.get(touchedMomentIndex).t = newT;
 
+                // TODO: Touch overlap, what if it overlaps itself though *brain emoji*, make sure that is handled.
+
+                // As long as we are over the moment that is SUPPOSED to be PREVIOUS to the moment we are replacing, move on an replace this moment instead.
+                while (touchedMomentReplaceIndex > 0 && newT < moments.get(touchedMomentReplaceIndex-1).t)
+                    touchedMomentReplaceIndex--;
+                // As long as we are over the moment that is SUPPOSED to be NEXT to the moment we are replacing, move on an replace this moment instead.
+                while (touchedMomentReplaceIndex < moments.size()-1 && newT > moments.get(touchedMomentReplaceIndex+1).t)
+                    touchedMomentReplaceIndex++;
+
+                invalidate();
                 break;
             case MotionEvent.ACTION_UP: // Finger just released the screen
                 // Sort the moments again.
-                if (touchedMomentIndex > -1)
-                    onMomentsTimeUpdated();
+                if (touchedMomentIndex > -1) {
+                    // Check if overlapped, if we did, place the moment back!
+                    if (touchedMomentOverlap) {
+                        Snackbar.make(parentView, "Moment overlap!", Snackbar.LENGTH_SHORT).show();
+                        moments.get(touchedMomentIndex).t = touchedMomentPreT;
+                    }
+                    else {
+                        // TODO: sort
+                    }
+                }
 
                 touchedMomentIndex = -1;
                 performClick();
@@ -233,25 +281,6 @@ public class Timeline extends View {
     protected void onSizeChanged(int w, int h, int oldW, int oldH) {
         super.onSizeChanged(w, h, oldW, oldH);
 
-        TypedValue typedValue = new TypedValue();
-        boolean resolved = getContext().getTheme().resolveAttribute(R.attr.inactiveTimelineColor, typedValue, true);
-        if (resolved) {
-            if (typedValue.type >= TypedValue.TYPE_FIRST_COLOR_INT && typedValue.type <= TypedValue.TYPE_LAST_COLOR_INT) {
-                // The attribute was resolved to a color value
-                int color = typedValue.data;
-                Log.d("onCreate()", String.valueOf(color));
-                inactiveTimelineColor = color;
-            } else {
-                // The attribute was resolved to a color reference, you need to resolve it to an actual color value
-                int colorRes = typedValue.resourceId;
-                int color = ContextCompat.getColor(getContext(), colorRes);
-                Log.d("onCreate()", String.valueOf(color));
-                inactiveTimelineColor = color;
-            }
-        } else {
-            Log.d("onCreate()", "Failed to get theme_color.");
-        }
-
         invalidate();
     }
 
@@ -259,19 +288,23 @@ public class Timeline extends View {
     // TODO: Includes radius
 
     float drawMoment(Canvas canvas, int i, float posX) {
-        paint.setColor(moments.get(i).color);
-        canvas.drawCircle(posX, getHeight() / 2.0f, MOMENT_RADIUS, paint);
+        float ret = posX;
 
         // Draw a line with the moment's color up until the next moment, if there is a next moment
         if (i < moments.size()-1) {
-            float nextPosX = calcPosX(moments.get(i+1));
-
-            canvas.drawLine(posX, getHeight() / 2.0f, nextPosX, getHeight() / 2.0f, paint);
-
-            // posX is now the next posX(updated)
-            return nextPosX;
+            ret = calcPosX(moments.get(i+1));
+            drawLine(canvas, i, posX, ret);
         }
-        return posX;
+
+        momentPaint.setColor(moments.get(i).color);
+        canvas.drawCircle(posX, getHeight() / 2.0f, MOMENT_RADIUS, momentPaint);
+
+        return ret;
+    }
+
+    void drawLine(Canvas canvas, int momentIndex, float startX, float endX) {
+        linePaint.setColor(moments.get(momentIndex).color);
+        canvas.drawLine(startX, getHeight() / 2.0f, endX, getHeight() / 2.0f, linePaint);
     }
 
     // TODO: This is one of the most expensive functions probably, find ways to optimize it to the level of a normal SeekBar.
@@ -287,8 +320,8 @@ public class Timeline extends View {
         if (posX + MOMENT_RADIUS > 0) {
             firstVisibleMoment = 0;
             // TODO: Find out how to have a theme dependant deactivated color
-            paint.setColor(inactiveTimelineColor);
-            canvas.drawLine(0, getHeight() / 2.0f, posX, getHeight() / 2.0f, paint);
+            linePaint.setColor(inactiveTimelineColor);
+            canvas.drawLine(0, getHeight() / 2.0f, posX, getHeight() / 2.0f, linePaint);
         }
         int lastOutsideStatus = 0;
 
@@ -299,8 +332,8 @@ public class Timeline extends View {
                     lastVisibleMoment = i - 1;
 
                 if (lastOutsideStatus == -1) {
-                    paint.setColor(moments.get(i - 1).color);
-                    canvas.drawLine(0, getHeight() / 2.0f, getWidth(), getHeight() / 2.0f, paint);
+                    linePaint.setColor(moments.get(i - 1).color);
+                    canvas.drawLine(0, getHeight() / 2.0f, getWidth(), getHeight() / 2.0f, linePaint);
                 }
                 break;
             }
@@ -310,8 +343,8 @@ public class Timeline extends View {
                     posX = calcPosX(moments.get(i + 1));
                 else {
                     // Draw a line of the last moment's color if it is indeed the LAST MOMENT.
-                    paint.setColor(moments.get(i).color);
-                    canvas.drawLine(0, getHeight() / 2.0f, getWidth(), getHeight() / 2.0f, paint);
+                    linePaint.setColor(moments.get(i).color);
+                    canvas.drawLine(0, getHeight() / 2.0f, getWidth(), getHeight() / 2.0f, linePaint);
                 }
             }
             else { // Inside
@@ -319,14 +352,14 @@ public class Timeline extends View {
                 if (lastOutsideStatus == -1) {
                     firstVisibleMoment = i; // This is the first visible!
                     lastOutsideStatus = 0;
-                    paint.setColor(moments.get(i - 1).color);
-                    canvas.drawLine(0, getHeight() / 2.0f, posX, getHeight() / 2.0f, paint);
+                    linePaint.setColor(moments.get(i - 1).color);
+                    canvas.drawLine(0, getHeight() / 2.0f, posX, getHeight() / 2.0f, linePaint);
                 }
 
                 // If this is the last one draw a line with this one's color to the end.
                 if (i == moments.size()-1 && posX - MOMENT_RADIUS < getWidth()) {
-                    paint.setColor(moments.get(i).color);
-                    canvas.drawLine(posX, getHeight() / 2.0f, getWidth(), getHeight() / 2.0f, paint);
+                    linePaint.setColor(moments.get(i).color);
+                    canvas.drawLine(posX, getHeight() / 2.0f, getWidth(), getHeight() / 2.0f, linePaint);
                 }
 
                 posX = drawMoment(canvas, i, posX);
