@@ -1,0 +1,9 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Base application theme. -->
+    <style name="Base.Theme.TimeLineProto" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="theme_color">@color/momentBlue</item>
+        <!-- Customize your dark theme here. -->
+         <item name="colorPrimary">@color/momentBlue</item>
+    </style>
+
+</resources>

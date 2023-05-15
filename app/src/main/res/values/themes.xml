@@ -1,0 +1,11 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Base application theme. -->
+    <style name="Base.Theme.TimeLineProto" parent="Theme.Material3.DayNight.NoActionBar">
+
+        <item name="theme_color">@color/momentRed</item>
+    </style>
+
+    <style name="Theme.TimeLineProto" parent="Base.Theme.TimeLineProto" >
+
+    </style>
+</resources>
