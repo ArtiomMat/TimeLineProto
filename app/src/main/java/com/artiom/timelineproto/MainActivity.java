@@ -3,13 +3,22 @@ package com.artiom.timelineproto;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 
+import android.animation.Animator;
+import android.animation.AnimatorListenerAdapter;
+import android.animation.ObjectAnimator;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.util.Log;
 import android.util.TypedValue;
+import android.view.View;
+import android.view.ViewTreeObserver;
+import android.view.animation.AnticipateInterpolator;
 import android.widget.LinearLayout;
 import android.widget.SeekBar;
 import android.widget.TextView;
+import android.widget.Toast;
+
+import com.google.android.material.snackbar.Snackbar;
 
 import java.sql.Time;
 import java.util.Locale;
@@ -119,13 +128,15 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        tl = new Timeline(this, findViewById(android.R.id.content));
+
         LinearLayout tlLayout = findViewById(R.id.timelineLayout);
+        tl = new Timeline(this, tlLayout);
         tlLayout.addView(
                 tl,
                 new LinearLayout.LayoutParams(
@@ -134,8 +145,8 @@ public class MainActivity extends AppCompatActivity {
                 )
         );
         tl.addMoment(2 * 60, 1, ContextCompat.getColor(getApplicationContext(), R.color.momentBlue));
-        tl.addMoment(5*60+45, 1, ContextCompat.getColor(getApplicationContext(), R.color.momentRed));
-        tl.addMoment(12*60+30, 1, ContextCompat.getColor(getApplicationContext(), R.color.momentYellow));
+        tl.addMoment(2 * 60 + 5, 1, ContextCompat.getColor(getApplicationContext(), R.color.momentRed));
+        tl.addMoment(2 * 60 + 10, 1, ContextCompat.getColor(getApplicationContext(), R.color.momentYellow));
         tl.addMoment(15*60, 1, ContextCompat.getColor(getApplicationContext(), R.color.momentPurple));
 
         setupTimeScale();

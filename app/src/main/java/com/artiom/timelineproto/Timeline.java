@@ -9,6 +9,7 @@ import android.util.Log;
 import android.util.TypedValue;
 import android.view.MotionEvent;
 import android.view.View;
+import android.widget.Toast;
 
 import androidx.core.content.ContextCompat;
 
@@ -36,11 +37,12 @@ public class Timeline extends View {
         public void setupTags(int numTags) {
             // tags
             if (numTags < 1) {
-                Snackbar.make(parentView, "Tags are important, you need one tag at least.", Snackbar.LENGTH_SHORT).show();
+                Toast.makeText(getContext(), "Tags are important, you need one tag at least.", Toast.LENGTH_LONG).show();
                 numTags = 1;
             }
             else if (numTags > MAX_TAGS) {
-                Snackbar.make(parentView, String.format(Locale.ENGLISH, "Up to %d tags please.", MAX_TAGS), Snackbar.LENGTH_SHORT).show();
+
+                Toast.makeText(getContext(), String.format(Locale.ENGLISH, "Up to %d tags please.", MAX_TAGS), Toast.LENGTH_SHORT).show();
                 numTags = MAX_TAGS;
             }
 
@@ -51,10 +53,10 @@ public class Timeline extends View {
             // tags
             if (t < 0) {
                 t = 0;
-                Snackbar.make(parentView, "I'm planning to make negative time a feature, but not now.", Snackbar.LENGTH_SHORT).show();
+                Toast.makeText(getContext(), "I'm planning to make negative time a feature, but not now.", Toast.LENGTH_LONG).show();
             }
             else if (t > 24*60) {
-                Snackbar.make(parentView, "I'm planning to make time overflow a feature, but not now.", Snackbar.LENGTH_SHORT).show();
+                Toast.makeText(getContext(), "I'm planning to make time overflow a feature, but not now.", Toast.LENGTH_LONG).show();
                 t = 24*60;
             }
 
@@ -90,50 +92,71 @@ public class Timeline extends View {
         }
     }
 
-    // TODO:
-    /*
-        // Step 1: Create a white circle drawable
-        ShapeDrawable whiteCircle = new ShapeDrawable(new OvalShape());
-        whiteCircle.getPaint().setColor(Color.WHITE);
-
-        // Step 2: Cache the white circle drawable
-
-        // You can store the white circle drawable as a class member or use any caching mechanism like LruCache or HashMap.
-
-        // Step 3: Tint the cached drawable
-        Drawable cachedDrawable = whiteCircle.getConstantState().newDrawable().mutate();
-        cachedDrawable.setColorFilter(color, PorterDuff.Mode.SRC_IN);
-
-        // 'color' should be the desired color you want to apply to the circle.
-
-        // Now you can use the 'cachedDrawable' to draw the colored circle on the canvas using the drawCircle() method.
-
-        // Example usage:
-        canvas.drawCircle(centerX, centerY, radius, cachedDrawable);
-     */
-
     // In SP units initially here, but becomes
     public float momentRadius = 20, timelineStroke = 10;
 
-    private final View parentView;
     private final ArrayList<Moment> moments;
     private final Paint linePaint, momentPaint;
 
     public static int inactiveTimelineColor = 0;
+    public static int timelineBackgroundColor = 0;
     public int firstVisibleMoment = -1, lastVisibleMoment = -1;
 
-    // So we order the list.
-    void onMomentsTimeUpdated() {
+    void replaceMomentWithPrev(int i) {
+        Moment prev = moments.get(i-1);
+        Moment moment = moments.get(i);
+        moments.set(i-1, moment);
+        moments.set(i, prev);
+    }
+
+    // This is a sort function that should be avoided if possible.
+    void sortMoments() {
         Collections.sort(moments);
+    }
+
+    void sortMomentToFirst(int i) {
+        for (; i > 0; i--) {
+            if (moments.get(i).t < moments.get(i-1).t)
+                replaceMomentWithPrev(i);
+            else
+                break;
+        }
+    }
+
+    void sortMomentToLast(int i) {
+        for (; i < moments.size()-1; i++) {
+            if (moments.get(i).t > moments.get(i+1).t)
+                replaceMomentWithPrev(i+1);
+            else
+                break;
+        }
+    }
+
+    // This version of sortMoments let's you sort if only a single moment was added.
+    // This should be the more common function that you use.
+    void sortMoments(int outlierIndex) {
+        Moment outlier = moments.get(outlierIndex);
+        if (outlierIndex == moments.size()-1)
+            sortMomentToFirst(outlierIndex);
+        else if (outlierIndex == 0)
+            sortMomentToLast(outlierIndex);
+        else if (outlier.t > moments.get(outlierIndex+1).t) {
+            replaceMomentWithPrev(outlierIndex+1);
+            sortMomentToLast(outlierIndex+1);
+        }
+        else if (outlier.t < moments.get(outlierIndex-1).t) {
+            replaceMomentWithPrev(outlierIndex);
+            sortMomentToFirst(outlierIndex-1);
+        }
     }
 
     public void addMoment(int t, int tags) {
         moments.add(new Moment(t, tags));
-        onMomentsTimeUpdated();
+        sortMomentToFirst(moments.size()-1);
     }
     public void addMoment(int t, int tags, int color) {
         moments.add(new Moment(t, tags, color));
-        onMomentsTimeUpdated();
+        sortMomentToFirst(moments.size()-1);
     }
 
     // NOTE: We need the MainActivity context
@@ -141,7 +164,6 @@ public class Timeline extends View {
         super(context);
 
         this.moments = new ArrayList<>();
-        this.parentView = parentView;
 
         // Setup the timelineStroke and momentRadius relative to screen
         float density = getResources().getDisplayMetrics().density;
@@ -159,27 +181,10 @@ public class Timeline extends View {
         // Use hardware rendering
         setLayerType(View.LAYER_TYPE_HARDWARE, null);
 
-        // Setup the color of an inactive region only if it wasn't initialized.
-        if (inactiveTimelineColor == 0) {
-            TypedValue typedValue = new TypedValue();
-            boolean resolved = getContext().getTheme().resolveAttribute(R.attr.inactiveTimelineColor, typedValue, true);
-            if (resolved) {
-                if (typedValue.type >= TypedValue.TYPE_FIRST_COLOR_INT && typedValue.type <= TypedValue.TYPE_LAST_COLOR_INT) {
-                    // The attribute was resolved to a color value
-                    int color = typedValue.data;
-                    Log.d("Timeline()", String.valueOf(color));
-                    inactiveTimelineColor = color;
-                } else {
-                    // The attribute was resolved to a color reference, you need to resolve it to an actual color value
-                    int colorRes = typedValue.resourceId;
-                    int color = ContextCompat.getColor(getContext(), colorRes);
-                    Log.d("Timeline()", String.valueOf(color));
-                    inactiveTimelineColor = color;
-                }
-            } else {
-                Log.d("Timeline()", "Failed to get theme_color.");
-            }
-        }
+        // Setup the colors...
+        inactiveTimelineColor = Util.getColorAttr(getContext(), R.attr.inactiveTimelineColor);
+        timelineBackgroundColor = Util.getColorAttr(getContext(), R.attr.timelineBackgroundColor);
+        parentView.setBackgroundColor(timelineBackgroundColor);
     }
 
     @Override
@@ -190,12 +195,6 @@ public class Timeline extends View {
         return super.performClick();
     }
 
-    void replaceMomentWithPrev(int i) {
-        Moment prev = moments.get(i-1);
-        Moment moment = moments.get(i);
-        moments.set(i-1, moment);
-        moments.set(i, prev);
-    }
 
     private int touchedMomentIndex = -1;
     private int touchedMomentPreT = -1;
@@ -206,12 +205,9 @@ public class Timeline extends View {
 
         switch (action) {
             case MotionEvent.ACTION_DOWN: // Finger just pressed the screen
-                Log.d("performClick", "MotionEvent.ACTION_DOWN");
                 // -1 indicates nothing is visible
-                if (firstVisibleMoment == -1) {
-                    Log.d("performClick", "Nothing visible ");
+                if (firstVisibleMoment == -1)
                     break;
-                }
 
                 // Loop through all moments visible and find the one being touched
                 for (int i = firstVisibleMoment; i <= lastVisibleMoment; i++) {
@@ -220,8 +216,7 @@ public class Timeline extends View {
                     // Checks if within range of the moment
                     if (touchX < momentX + momentRadius && touchX > momentX - momentRadius) {
                         touchedMomentIndex = i;
-                        touchedMomentPreT = moments.get(i).t;
-                        Log.d("performClick", "Selected "+i);
+                        touchedMomentPreT = moments.get(i).t; // Save the moment time
                         break;
                     }
                 }
@@ -235,10 +230,9 @@ public class Timeline extends View {
                 int newT = calcT((int) touchX);
                 moments.get(touchedMomentIndex).t = newT;
 
-                // As long as we are over the moment that is SUPPOSED to be PREVIOUS to the moment we are replacing, move on an replace this moment instead.
                 if (touchedMomentIndex > 0 && newT < moments.get(touchedMomentIndex - 1).t)
                     replaceMomentWithPrev(touchedMomentIndex--);
-                // As long as we are over the moment that is SUPPOSED to be NEXT to the moment we are replacing, move on an replace this moment instead.
+                    // As long as we are over the moment that is SUPPOSED to be NEXT to the moment we are replacing, move on an replace this moment instead.
                 else if (touchedMomentIndex < moments.size() - 1 && newT > moments.get(touchedMomentIndex + 1).t)
                     replaceMomentWithPrev(++touchedMomentIndex);
 
@@ -255,23 +249,18 @@ public class Timeline extends View {
                             ||
                             (touchedMomentIndex > 0 && moments.get(touchedMomentIndex).t == moments.get(touchedMomentIndex-1).t)
                     ) {
-                        Snackbar.make(parentView, "Moment overlap!", Snackbar.LENGTH_SHORT).show();
+                        Toast.makeText(getContext(), "Moment overlap!", Toast.LENGTH_SHORT).show();
 
-                        int t = moments.get(touchedMomentIndex).t = touchedMomentPreT;
-
-                        // FIXME: Duplicate of the above if and else, just not a loop.
-                        while (touchedMomentIndex < moments.size() - 1 && t > moments.get(++touchedMomentIndex).t)
-                            replaceMomentWithPrev(touchedMomentIndex);
-                        while (touchedMomentIndex > 0 && t < moments.get(--touchedMomentIndex).t)
-                            replaceMomentWithPrev(touchedMomentIndex+1);
-
-                        // Since we probably fucked around
-                        invalidate();
+                        moments.get(touchedMomentIndex).t = touchedMomentPreT;
                     }
+
+                    sortMoments(touchedMomentIndex);
                 }
+
 
                 touchedMomentIndex = -1;
                 performClick();
+                invalidate();
                 break;
 
             default:
