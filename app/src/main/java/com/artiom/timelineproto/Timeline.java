@@ -3,22 +3,13 @@ package com.artiom.timelineproto;
 import android.annotation.SuppressLint;
 import android.content.Context;
 import android.graphics.Canvas;
-import android.graphics.Color;
 import android.graphics.Paint;
-import android.util.Log;
-import android.util.TypedValue;
 import android.view.MotionEvent;
 import android.view.View;
 import android.widget.Toast;
 
-import androidx.core.content.ContextCompat;
-
-import com.google.android.material.snackbar.Snackbar;
-
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Locale;
-import java.util.concurrent.ThreadLocalRandom;
 
 @SuppressLint({"ViewConstructor"})
 public class Timeline extends View {
@@ -29,9 +20,9 @@ public class Timeline extends View {
         // In minutes
         public int t;
 
-        public String name;
+//        public String name;
         public byte[] tags;
-        public int iconIndex;
+//        public int iconIndex;
         public int color;
 
         public void setupTags(int numTags) {
@@ -63,19 +54,19 @@ public class Timeline extends View {
             this.t = t;
         }
 
-        public Moment(int t, int numTags) {
-            // Randomize color
-            float r = ThreadLocalRandom.current().nextFloat();
-            float g = ThreadLocalRandom.current().nextFloat();
-            float b = ThreadLocalRandom.current().nextFloat();
-            color = Color.valueOf(r, g, b).toArgb();
-
-            // numTags
-            setupTags(numTags);
-
-            // t
-            setupTime(t);
-        }
+//        public Moment(int t, int numTags) {
+//            // Randomize color
+//            float r = ThreadLocalRandom.current().nextFloat();
+//            float g = ThreadLocalRandom.current().nextFloat();
+//            float b = ThreadLocalRandom.current().nextFloat();
+//            color = Color.valueOf(r, g, b).toArgb();
+//
+//            // numTags
+//            setupTags(numTags);
+//
+//            // t
+//            setupTime(t);
+//        }
 
         public Moment(int t, int numTags, int color) {
             // color
@@ -93,7 +84,8 @@ public class Timeline extends View {
     }
 
     // In SP units initially here, but becomes
-    public float momentRadius = 20, timelineStroke = 10;
+    public float timelineStroke = 3, momentRadius = timelineStroke*3, momentTouchRadius = 20;
+
 
     private final ArrayList<Moment> moments;
     private final Paint linePaint, momentPaint;
@@ -110,9 +102,9 @@ public class Timeline extends View {
     }
 
     // This is a sort function that should be avoided if possible.
-    void sortMoments() {
-        Collections.sort(moments);
-    }
+//    void sortMoments() {
+//        Collections.sort(moments);
+//    }
 
     void sortMomentToFirst(int i) {
         for (; i > 0; i--) {
@@ -150,10 +142,6 @@ public class Timeline extends View {
         }
     }
 
-    public void addMoment(int t, int tags) {
-        moments.add(new Moment(t, tags));
-        sortMomentToFirst(moments.size()-1);
-    }
     public void addMoment(int t, int tags, int color) {
         moments.add(new Moment(t, tags, color));
         sortMomentToFirst(moments.size()-1);
@@ -169,6 +157,7 @@ public class Timeline extends View {
         float density = getResources().getDisplayMetrics().density;
         timelineStroke *= density;
         momentRadius *= density;
+        momentTouchRadius *= density;
 
         linePaint = new Paint();
         linePaint.setStyle(Paint.Style.STROKE);
@@ -214,7 +203,7 @@ public class Timeline extends View {
                     float momentX = calcPosX(moments.get(i));
 
                     // Checks if within range of the moment
-                    if (touchX < momentX + momentRadius && touchX > momentX - momentRadius) {
+                    if (touchX < momentX + momentTouchRadius && touchX > momentX - momentTouchRadius) {
                         touchedMomentIndex = i;
                         touchedMomentPreT = moments.get(i).t; // Save the moment time
                         break;
