@@ -32,6 +32,7 @@ public class MainActivity extends AppCompatActivity {
 
     // Outside because setupTimeStart and setupTimeScale use it both.
     TextView timeStartTextView;
+    SeekBar timeStartSeekBar;
 
     Timeline tl;
 
@@ -47,7 +48,6 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void setupTimeStart() {
-        SeekBar timeStartSeekBar;
 
         timeStartTextView = findViewById(R.id.timeStartTextView);
         setTimeText("Start",timeStartTextView,timeStart);
@@ -88,6 +88,7 @@ public class MainActivity extends AppCompatActivity {
 
         // Seek bar
         timeScaleSeekBar = findViewById(R.id.timeScaleSeekBar);
+        timeScaleSeekBar.animate();
         timeScaleSeekBar.setMax(TIME_SCALE_SB_MAX);
         timeScaleSeekBar.setMin(0);
 
@@ -95,12 +96,10 @@ public class MainActivity extends AppCompatActivity {
         timeScaleSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onStopTrackingTouch(SeekBar seekBar) {
-                // If timescale is changed it should also modify the current time start, as time start still assumes it is in the up to date scale.
+                // If timescale is changed it should also modify the current time start seekbar, as time start still assumes it is in the up to date scale.
                 // We modify it here so we use less CPU power.
-                // FIXME: Fix it!
-                timeStart = ((24 * 60) - timeScale) * (timeStart / (24 * 60));
-                setTimeText("Start", timeStartTextView, timeStart);
-                tl.invalidate();
+
+                timeStartSeekBar.setProgress((int) (TIME_START_SB_MAX * (timeStart / (24 * 60 - timeScale))), false);
             }
 
             @Override

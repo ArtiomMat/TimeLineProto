@@ -2,7 +2,6 @@ package com.artiom.timelineproto;
 
 import android.annotation.SuppressLint;
 import android.content.Context;
-import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
@@ -113,13 +112,14 @@ public class Timeline extends View {
         canvas.drawCircle(centerX, centerY, radius, cachedDrawable);
      */
 
-    public static final float MOMENT_RADIUS = 40;
+    // In SP units initially here, but becomes
+    public float momentRadius = 20, timelineStroke = 10;
 
     private final View parentView;
     private final ArrayList<Moment> moments;
     private final Paint linePaint, momentPaint;
 
-    public int inactiveTimelineColor;
+    public static int inactiveTimelineColor = 0;
     public int firstVisibleMoment = -1, lastVisibleMoment = -1;
 
     // So we order the list.
@@ -143,9 +143,14 @@ public class Timeline extends View {
         this.moments = new ArrayList<>();
         this.parentView = parentView;
 
+        // Setup the timelineStroke and momentRadius relative to screen
+        float density = getResources().getDisplayMetrics().density;
+        timelineStroke *= density;
+        momentRadius *= density;
+
         linePaint = new Paint();
         linePaint.setStyle(Paint.Style.STROKE);
-        linePaint.setStrokeWidth(30f);
+        linePaint.setStrokeWidth(timelineStroke);
 
         momentPaint = new Paint();
         momentPaint.setStyle(Paint.Style.FILL);
@@ -154,25 +159,26 @@ public class Timeline extends View {
         // Use hardware rendering
         setLayerType(View.LAYER_TYPE_HARDWARE, null);
 
-        // Setup the color of an inactive region
-
-        TypedValue typedValue = new TypedValue();
-        boolean resolved = getContext().getTheme().resolveAttribute(R.attr.inactiveTimelineColor, typedValue, true);
-        if (resolved) {
-            if (typedValue.type >= TypedValue.TYPE_FIRST_COLOR_INT && typedValue.type <= TypedValue.TYPE_LAST_COLOR_INT) {
-                // The attribute was resolved to a color value
-                int color = typedValue.data;
-                Log.d("onCreate()", String.valueOf(color));
-                inactiveTimelineColor = color;
+        // Setup the color of an inactive region only if it wasn't initialized.
+        if (inactiveTimelineColor == 0) {
+            TypedValue typedValue = new TypedValue();
+            boolean resolved = getContext().getTheme().resolveAttribute(R.attr.inactiveTimelineColor, typedValue, true);
+            if (resolved) {
+                if (typedValue.type >= TypedValue.TYPE_FIRST_COLOR_INT && typedValue.type <= TypedValue.TYPE_LAST_COLOR_INT) {
+                    // The attribute was resolved to a color value
+                    int color = typedValue.data;
+                    Log.d("Timeline()", String.valueOf(color));
+                    inactiveTimelineColor = color;
+                } else {
+                    // The attribute was resolved to a color reference, you need to resolve it to an actual color value
+                    int colorRes = typedValue.resourceId;
+                    int color = ContextCompat.getColor(getContext(), colorRes);
+                    Log.d("Timeline()", String.valueOf(color));
+                    inactiveTimelineColor = color;
+                }
             } else {
-                // The attribute was resolved to a color reference, you need to resolve it to an actual color value
-                int colorRes = typedValue.resourceId;
-                int color = ContextCompat.getColor(getContext(), colorRes);
-                Log.d("onCreate()", String.valueOf(color));
-                inactiveTimelineColor = color;
+                Log.d("Timeline()", "Failed to get theme_color.");
             }
-        } else {
-            Log.d("onCreate()", "Failed to get theme_color.");
         }
     }
 
@@ -212,7 +218,7 @@ public class Timeline extends View {
                     float momentX = calcPosX(moments.get(i));
 
                     // Checks if within range of the moment
-                    if (touchX < momentX + MOMENT_RADIUS && touchX > momentX - MOMENT_RADIUS) {
+                    if (touchX < momentX + momentRadius && touchX > momentX - momentRadius) {
                         touchedMomentIndex = i;
                         touchedMomentPreT = moments.get(i).t;
                         Log.d("performClick", "Selected "+i);
@@ -305,7 +311,7 @@ public class Timeline extends View {
         }
 
         momentPaint.setColor(moments.get(i).color);
-        canvas.drawCircle(posX, getHeight() / 2.0f, MOMENT_RADIUS, momentPaint);
+        canvas.drawCircle(posX, getHeight() / 2.0f, momentRadius, momentPaint);
 
         return ret;
     }
@@ -325,7 +331,7 @@ public class Timeline extends View {
 
         float posX = calcPosX(moments.get(0)); // Updated to next at the end of the loop so we put it here
         // If already the first one is too far then draw a line to it
-        if (posX + MOMENT_RADIUS > 0) {
+        if (posX + momentRadius > 0) {
             firstVisibleMoment = 0;
             linePaint.setColor(inactiveTimelineColor);
             canvas.drawLine(0, getHeight() / 2.0f, posX, getHeight() / 2.0f, linePaint);
@@ -333,7 +339,7 @@ public class Timeline extends View {
         int lastOutsideStatus = 0;
 
         for (int i = 0; i < moments.size(); i++) {
-            if (posX - MOMENT_RADIUS > getWidth()) { // Above width
+            if (posX - momentRadius > getWidth()) { // Above width
                 // Only set lastVisibleMoment to the last visible if there was a first visible
                 if (firstVisibleMoment > -1)
                     lastVisibleMoment = i - 1;
@@ -344,7 +350,7 @@ public class Timeline extends View {
                 }
                 break;
             }
-            else if (posX + MOMENT_RADIUS < 0) { // Below 0
+            else if (posX + momentRadius < 0) { // Below 0
                 lastOutsideStatus = -1;
                 if (i < moments.size()-1)
                     posX = calcPosX(moments.get(i + 1));
@@ -364,7 +370,7 @@ public class Timeline extends View {
                 }
 
                 // If this is the last one draw a line with this one's color to the end.
-                if (i == moments.size()-1 && posX - MOMENT_RADIUS < getWidth()) {
+                if (i == moments.size()-1 && posX - momentRadius < getWidth()) {
                     linePaint.setColor(moments.get(i).color);
                     canvas.drawLine(posX, getHeight() / 2.0f, getWidth(), getHeight() / 2.0f, linePaint);
                 }
