@@ -97,8 +97,10 @@ public class MainActivity extends AppCompatActivity {
             public void onStopTrackingTouch(SeekBar seekBar) {
                 // If timescale is changed it should also modify the current time start, as time start still assumes it is in the up to date scale.
                 // We modify it here so we use less CPU power.
+                // FIXME: Fix it!
                 timeStart = ((24 * 60) - timeScale) * (timeStart / (24 * 60));
                 setTimeText("Start", timeStartTextView, timeStart);
+                tl.invalidate();
             }
 
             @Override
@@ -106,7 +108,6 @@ public class MainActivity extends AppCompatActivity {
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
                 timeScale = TIME_SCALE_SB_FACTOR * progress * progress * progress + TIME_SCALE_MIN;
                 setTimeText("Scale", timeScaleTextView,timeScale);
-
 
                 // Make tl redraw stuff, since we changed the scale, moments need to move.
                 tl.invalidate();

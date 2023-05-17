@@ -117,10 +117,7 @@ public class Timeline extends View {
 
     private final View parentView;
     private final ArrayList<Moment> moments;
-
-    private Bitmap timelineBitmap; // We cache the timeline as it doesn't move.
     private final Paint linePaint, momentPaint;
-    Canvas timelineCanvas;
 
     public int inactiveTimelineColor;
     public int firstVisibleMoment = -1, lastVisibleMoment = -1;
@@ -187,15 +184,15 @@ public class Timeline extends View {
         return super.performClick();
     }
 
+    void replaceMomentWithPrev(int i) {
+        Moment prev = moments.get(i-1);
+        Moment moment = moments.get(i);
+        moments.set(i-1, moment);
+        moments.set(i, prev);
+    }
+
     private int touchedMomentIndex = -1;
     private int touchedMomentPreT = -1;
-    // This is the index of the moment the touched moment finna replace.
-    // This index is used for 2 things:
-    // 1. Checking if the moment overlaps with any other moment.
-    // 2. Re-sorting more efficiently because we know exactly where it wants to go.
-    // Calculation is in the ACTION_MOVE case, where we simply check if we went over of below neighbor.
-    private int touchedMomentReplaceIndex = -1;
-    private boolean touchedMomentOverlap = false;
     @Override
     public boolean onTouchEvent(MotionEvent event) {
         int action = event.getAction();
@@ -216,14 +213,14 @@ public class Timeline extends View {
 
                     // Checks if within range of the moment
                     if (touchX < momentX + MOMENT_RADIUS && touchX > momentX - MOMENT_RADIUS) {
-                        touchedMomentIndex = touchedMomentReplaceIndex = i;
+                        touchedMomentIndex = i;
                         touchedMomentPreT = moments.get(i).t;
                         Log.d("performClick", "Selected "+i);
                         break;
                     }
                 }
                 break;
-            case MotionEvent.ACTION_MOVE: // Finger is moving on the screen
+            case MotionEvent.ACTION_MOVE: { // Finger is moving on the screen
 //                Log.d("performClick", "OMG MOVE!");
                 // touchedMomentIndex = -1 indicates that no moment was even touched, the user is just fucking moving their finger...
                 if (touchedMomentIndex == -1)
@@ -232,44 +229,38 @@ public class Timeline extends View {
                 int newT = calcT((int) touchX);
                 moments.get(touchedMomentIndex).t = newT;
 
-                // TODO: Touch overlap, what if it overlaps itself though *brain emoji*, make sure that is handled.
-
                 // As long as we are over the moment that is SUPPOSED to be PREVIOUS to the moment we are replacing, move on an replace this moment instead.
-                while (touchedMomentReplaceIndex > 0 && newT < moments.get(touchedMomentReplaceIndex-1).t)
-                    touchedMomentReplaceIndex--;
+                if (touchedMomentIndex > 0 && newT < moments.get(touchedMomentIndex - 1).t)
+                    replaceMomentWithPrev(touchedMomentIndex--);
                 // As long as we are over the moment that is SUPPOSED to be NEXT to the moment we are replacing, move on an replace this moment instead.
-                while (touchedMomentReplaceIndex < moments.size()-1 && newT > moments.get(touchedMomentReplaceIndex+1).t)
-                    touchedMomentReplaceIndex++;
+                else if (touchedMomentIndex < moments.size() - 1 && newT > moments.get(touchedMomentIndex + 1).t)
+                    replaceMomentWithPrev(++touchedMomentIndex);
 
                 invalidate();
                 break;
+            }
             case MotionEvent.ACTION_UP: // Finger just released the screen
                 // Sort the moments again.
                 if (touchedMomentIndex > -1) {
-                    // Check if overlapped, if we did, place the moment back!
-                    if (touchedMomentOverlap) {
-                        Snackbar.make(parentView, "Moment overlap!", Snackbar.LENGTH_SHORT).show();
-                        moments.get(touchedMomentIndex).t = touchedMomentPreT;
-                    }
-                    // We are good, no overlapping...
-                    else {
-                        Moment backup = moments.get(touchedMomentIndex);
 
-                        // If we moved it back in time then we need one procedure, and another for moving forward
-                        if (touchedMomentReplaceIndex < touchedMomentIndex) {
-                            // Essentially shift all the moments after the moved moment.
-                            for (int i = touchedMomentIndex; i > touchedMomentReplaceIndex; i--)
-                                moments.set(i, moments.get(i-1));
-                            // Put the moved moment in it's place.
-                            moments.set(touchedMomentReplaceIndex, backup);
-                        }
-                        else {
-                            // Essentially shift all the moments before the moved moment.
-                            for (int i = touchedMomentIndex; i < touchedMomentReplaceIndex; i++)
-                                moments.set(i, moments.get(i+1));
-                            // Put the moved moment in it's place.
-                            moments.set(touchedMomentReplaceIndex, backup);
-                        }
+                    // Check if we CAN overlap THEN if we overlapped, if we did, place the moment back!
+                    if (
+                        (touchedMomentIndex < moments.size() - 1 && moments.get(touchedMomentIndex).t == moments.get(touchedMomentIndex+1).t)
+                            ||
+                            (touchedMomentIndex > 0 && moments.get(touchedMomentIndex).t == moments.get(touchedMomentIndex-1).t)
+                    ) {
+                        Snackbar.make(parentView, "Moment overlap!", Snackbar.LENGTH_SHORT).show();
+
+                        int t = moments.get(touchedMomentIndex).t = touchedMomentPreT;
+
+                        // FIXME: Duplicate of the above if and else, just not a loop.
+                        while (touchedMomentIndex < moments.size() - 1 && t > moments.get(++touchedMomentIndex).t)
+                            replaceMomentWithPrev(touchedMomentIndex);
+                        while (touchedMomentIndex > 0 && t < moments.get(--touchedMomentIndex).t)
+                            replaceMomentWithPrev(touchedMomentIndex+1);
+
+                        // Since we probably fucked around
+                        invalidate();
                     }
                 }
 
@@ -336,7 +327,6 @@ public class Timeline extends View {
         // If already the first one is too far then draw a line to it
         if (posX + MOMENT_RADIUS > 0) {
             firstVisibleMoment = 0;
-            // TODO: Find out how to have a theme dependant deactivated color
             linePaint.setColor(inactiveTimelineColor);
             canvas.drawLine(0, getHeight() / 2.0f, posX, getHeight() / 2.0f, linePaint);
         }
