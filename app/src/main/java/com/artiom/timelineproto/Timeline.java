@@ -176,7 +176,7 @@ public class Timeline extends View {
 
         momentPaint = new Paint();
         momentPaint.setStyle(Paint.Style.FILL);
-        momentPaint.setShadowLayer(10f, 0f, 0f, Color.BLACK); // Add a shadow
+//        momentPaint.setShadowLayer(10f, 0f, 0f, Color.BLACK); // Add a shadow
 
         // Use hardware rendering
         setLayerType(View.LAYER_TYPE_HARDWARE, null);

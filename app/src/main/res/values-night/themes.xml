@@ -2,17 +2,18 @@
     <!-- Base application theme. -->
 
     <style name="Base.Theme.TimeLineProto" parent="Theme.Material3.DayNight.NoActionBar">
-        <item name="inactiveTimelineColor">@color/grey0</item>
-        <item name="timelineBackgroundColor">@color/grey3</item>
+        <item name="colorAccent">@color/momentBlue</item>
 
-        <item name="android:textColor">@color/grey0</item>
+        <item name="inactiveTimelineColor">?android:attr/colorControlHighlight</item>
+        <item name="timelineBackgroundColor">?android:attr/colorBackground</item>
+
+        <item name="android:statusBarColor">?android:attr/colorBackground</item>
+
+        <item name="android:textColor">@color/light</item>
 
         <item name="android:windowSplashScreenAnimatedIcon">@drawable/icon_anim</item>
-        <item name="android:windowSplashScreenBackground">@color/grey2</item>
-        <item name="android:windowSplashScreenAnimationDuration">1000</item>
+        <item name="android:windowSplashScreenAnimationDuration">500</item>
 
-        <item name="android:background">@color/grey2</item>
-        <item name="android:statusBarColor">@color/grey2</item>
     </style>
 
 </resources>

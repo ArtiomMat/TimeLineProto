@@ -16,27 +16,27 @@
                 <path
                     android:name="red_line_1"
                     android:pathData="M -55.733 55.219 L 159.944 55.219 L 159.944 72.781 L -55.733 72.781 Z"
-                    android:fillColor="#ff4141"
+                    android:fillColor="@color/momentRed"
                     android:strokeWidth="1"/>
                 <path
                     android:name="blue_line_1"
                     android:pathData="M -21.508 55.219 L 143.698 55.219 L 143.698 72.781 L -21.508 72.781 Z"
-                    android:fillColor="#19aeff"
+                    android:fillColor="@color/momentBlue"
                     android:strokeWidth="1"/>
                 <path
                     android:name="yellow_line_1"
                     android:pathData="M -72.112 55.219 L -7.788 55.219 L -7.788 72.781 L -72.112 72.781 Z"
-                    android:fillColor="#ffff3e"
+                    android:fillColor="@color/momentYellow"
                     android:strokeWidth="1"/>
                 <path
                     android:name="blue_circle_1"
                     android:pathData="M -20.234 47.26 C -24.672 47.26 -28.933 49.025 -32.071 52.163 C -35.209 55.301 -36.974 59.562 -36.974 64 C -36.974 68.438 -35.209 72.699 -32.071 75.837 C -28.933 78.975 -24.672 80.74 -20.234 80.74 C -15.796 80.74 -11.535 78.975 -8.397 75.837 C -5.259 72.699 -3.494 68.438 -3.494 64 C -3.494 59.562 -5.259 55.301 -8.397 52.163 C -11.535 49.025 -15.796 47.26 -20.234 47.26 Z"
-                    android:fillColor="#19aeff"
+                    android:fillColor="@color/momentBlue"
                     android:strokeWidth="1"/>
                 <path
                     android:name="red_circle_1"
                     android:pathData="M 152.846 47.26 C 148.408 47.26 144.148 49.025 141.009 52.163 C 137.871 55.301 136.106 59.562 136.106 64 C 136.106 68.438 137.871 72.699 141.009 75.837 C 144.148 78.975 148.408 80.74 152.846 80.74 C 157.284 80.74 161.545 78.975 164.683 75.837 C 167.821 72.699 169.586 68.438 169.586 64 C 169.586 59.562 167.821 55.301 164.683 52.163 C 161.545 49.025 157.284 47.26 152.846 47.26 Z"
-                    android:fillColor="#ff4141"
+                    android:fillColor="@color/momentRed"
                     android:strokeWidth="1"/>
             </group>
         </vector>
