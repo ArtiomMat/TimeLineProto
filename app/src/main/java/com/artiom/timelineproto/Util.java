@@ -8,6 +8,7 @@ import androidx.core.content.ContextCompat;
 
 public class Util {
     public static int getColorAttr(Context context, int resID) {
+
         int color = 0;
         TypedValue typedValue = new TypedValue();
         boolean resolved = context.getTheme().resolveAttribute(resID, typedValue, true);

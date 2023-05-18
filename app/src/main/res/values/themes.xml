@@ -1,16 +1,20 @@
-<resources xmlns:tools="http://schemas.android.com/tools">
+<resources>
     <!-- Base application theme. -->
 
     <style name="Base.Theme.TimeLineProto" parent="Theme.Material3.DayNight.NoActionBar">
-        <item name="inactiveTimelineColor">@color/grey2</item>
+
+        <item name="inactiveTimelineColor">?android:attr/colorControlHighlight</item>
         <item name="timelineBackgroundColor">?android:attr/colorBackground</item>
 
         <!-- TODO: Use theme attributes instead of colors in themes, ?attr/... not @color/... -->
         <item name="android:windowSplashScreenAnimatedIcon">@drawable/icon_anim</item>
         <item name="android:windowSplashScreenAnimationDuration">500</item>
 
+        <item name="android:windowLightStatusBar">true</item>
+
     </style>
 
     <style name="Theme.TimeLineProto" parent="Base.Theme.TimeLineProto" >
+        <item name="android:statusBarColor">?android:attr/colorBackground</item>
     </style>
 </resources>

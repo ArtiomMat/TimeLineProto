@@ -4,6 +4,7 @@ import android.annotation.SuppressLint;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Paint;
+import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
 import android.widget.Toast;
@@ -84,7 +85,7 @@ public class Timeline extends View {
     }
 
     // In SP units initially here, but becomes
-    public float timelineStroke = 3, momentRadius = timelineStroke*3, momentTouchRadius = 20;
+    public float timelineStroke = 2.5f, momentRadius = timelineStroke*2.5f, momentTouchRadius = 20;
 
 
     private final ArrayList<Moment> moments;
@@ -93,6 +94,39 @@ public class Timeline extends View {
     public static int inactiveTimelineColor = 0;
     public static int timelineBackgroundColor = 0;
     public int firstVisibleMoment = -1, lastVisibleMoment = -1;
+
+    public static int padding = 30; // In DP
+
+    // NOTE: We need the MainActivity context
+    public Timeline(Context context, View parentView) {
+        super(context);
+
+        this.moments = new ArrayList<>();
+
+        // Setup stuff that is in DP:
+        float density = getResources().getDisplayMetrics().density;
+        timelineStroke *= density;
+        momentRadius *= density;
+        momentTouchRadius *= density;
+        padding *= density;
+
+        linePaint = new Paint();
+        linePaint.setStyle(Paint.Style.STROKE);
+        linePaint.setStrokeWidth(timelineStroke);
+
+        momentPaint = new Paint();
+        momentPaint.setStyle(Paint.Style.FILL);
+
+        // Use hardware rendering
+        setLayerType(View.LAYER_TYPE_HARDWARE, null);
+
+        // Setup the colors...
+        inactiveTimelineColor = Util.getColorAttr(getContext(), R.attr.inactiveTimelineColor);
+        timelineBackgroundColor = Util.getColorAttr(getContext(), R.attr.timelineBackgroundColor);
+        parentView.setBackgroundColor(timelineBackgroundColor);
+
+        Log.d("Timeline()", "Called.");
+    }
 
     void replaceMomentWithPrev(int i) {
         Moment prev = moments.get(i-1);
@@ -147,35 +181,6 @@ public class Timeline extends View {
         sortMomentToFirst(moments.size()-1);
     }
 
-    // NOTE: We need the MainActivity context
-    public Timeline(Context context, View parentView) {
-        super(context);
-
-        this.moments = new ArrayList<>();
-
-        // Setup the timelineStroke and momentRadius relative to screen
-        float density = getResources().getDisplayMetrics().density;
-        timelineStroke *= density;
-        momentRadius *= density;
-        momentTouchRadius *= density;
-
-        linePaint = new Paint();
-        linePaint.setStyle(Paint.Style.STROKE);
-        linePaint.setStrokeWidth(timelineStroke);
-
-        momentPaint = new Paint();
-        momentPaint.setStyle(Paint.Style.FILL);
-//        momentPaint.setShadowLayer(10f, 0f, 0f, Color.BLACK); // Add a shadow
-
-        // Use hardware rendering
-        setLayerType(View.LAYER_TYPE_HARDWARE, null);
-
-        // Setup the colors...
-        inactiveTimelineColor = Util.getColorAttr(getContext(), R.attr.inactiveTimelineColor);
-        timelineBackgroundColor = Util.getColorAttr(getContext(), R.attr.timelineBackgroundColor);
-        parentView.setBackgroundColor(timelineBackgroundColor);
-    }
-
     @Override
     public boolean performClick() {
 //        Log.d("performClick", "OMG CLICK!");
@@ -216,12 +221,19 @@ public class Timeline extends View {
                 if (touchedMomentIndex == -1)
                     break;
 
+                // Cap touch to padding
+                if (touchX > getWidth()-padding)
+                    touchX = getWidth()-padding;
+                else if (touchX < padding)
+                    touchX = padding;
+
                 int newT = calcT((int) touchX);
+
                 moments.get(touchedMomentIndex).t = newT;
 
                 if (touchedMomentIndex > 0 && newT < moments.get(touchedMomentIndex - 1).t)
                     replaceMomentWithPrev(touchedMomentIndex--);
-                    // As long as we are over the moment that is SUPPOSED to be NEXT to the moment we are replacing, move on an replace this moment instead.
+                // As long as we are over the moment that is SUPPOSED to be NEXT to the moment we are replacing, move on an replace this moment instead.
                 else if (touchedMomentIndex < moments.size() - 1 && newT > moments.get(touchedMomentIndex + 1).t)
                     replaceMomentWithPrev(++touchedMomentIndex);
 
@@ -259,12 +271,19 @@ public class Timeline extends View {
         return true;
     }
 
+    // Should be used exclusively for calculating the position of a moment.
     float calcPosX(Moment moment) {
-        return ((moment.t - MainActivity.timeStart) / MainActivity.timeScale) * getWidth();
+        int paddedWidth = getWidth()-(padding*2);
+        float pos = ((moment.t - MainActivity.timeStart) / MainActivity.timeScale) * paddedWidth;
+        pos += padding;
+
+        return pos;
     }
 
     int calcT(int x) {
-        return (int) ((x*1.0f/getWidth()) * MainActivity.timeScale + MainActivity.timeStart);
+        int paddedWidth = getWidth()-(padding*2);
+
+        return (int) (((x-padding)*1.0f/paddedWidth) * MainActivity.timeScale + MainActivity.timeStart);
     }
 
     // This is here because getWidth and getHeight obviously wont work immidetly
@@ -285,7 +304,8 @@ public class Timeline extends View {
         // Draw a line with the moment's color up until the next moment, if there is a next moment
         if (i < moments.size()-1) {
             ret = calcPosX(moments.get(i+1));
-            drawLine(canvas, i, posX, ret);
+
+            drawMomentLine(canvas, i, posX, Math.min(ret, getWidth()-padding));
         }
 
         momentPaint.setColor(moments.get(i).color);
@@ -294,12 +314,18 @@ public class Timeline extends View {
         return ret;
     }
 
-    void drawLine(Canvas canvas, int momentIndex, float startX, float endX) {
-        linePaint.setColor(moments.get(momentIndex).color);
+    // This one draws a line with a moment's color
+    void drawMomentLine(Canvas canvas, int momentIndex, float startX, float endX) {
+        drawLine(canvas, moments.get(momentIndex).color, startX, endX);
+    }
+
+    void drawLine(Canvas canvas, int color, float startX, float endX) {
+        linePaint.setColor(color);
         canvas.drawLine(startX, getHeight() / 2.0f, endX, getHeight() / 2.0f, linePaint);
     }
 
     // TODO: This is one of the most expensive functions probably, find ways to optimize it to the level of a normal SeekBar.
+    // UPDATE May 18 2023: onDraw is hacked as fuck. Removed some duplicated code though, using drawLine.
     @Override
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
@@ -308,49 +334,52 @@ public class Timeline extends View {
         lastVisibleMoment = moments.size() - 1;
 
         float posX = calcPosX(moments.get(0)); // Updated to next at the end of the loop so we put it here
-        // If already the first one is too far then draw a line to it
-        if (posX + momentRadius > 0) {
+        // If already the first one is too far then draw an inactive line to it(padded line)
+        if (posX + momentRadius > padding) {
             firstVisibleMoment = 0;
-            linePaint.setColor(inactiveTimelineColor);
-            canvas.drawLine(0, getHeight() / 2.0f, posX, getHeight() / 2.0f, linePaint);
+            // hackey as fuck again, but we cap the position of the line to the padded location
+            drawLine(canvas, inactiveTimelineColor, padding, Math.min(posX, getWidth()-padding));
         }
+
+        // Bruh. This is actually just a boolean, stating whether or not the last moment was outside the visible area.
+        // Not just a regular boolean, either -1 or 0, now that's cutting edge Android dev right there.
+        // I don't know what I was on when implementing this variable, but I am leaving it as is.
         int lastOutsideStatus = 0;
 
         for (int i = 0; i < moments.size(); i++) {
-            if (posX - momentRadius > getWidth()) { // Above width
+            // Moment is above width
+            if (posX - momentRadius > getWidth()-padding) {
                 // Only set lastVisibleMoment to the last visible if there was a first visible
                 if (firstVisibleMoment > -1)
                     lastVisibleMoment = i - 1;
 
-                if (lastOutsideStatus == -1) {
-                    linePaint.setColor(moments.get(i - 1).color);
-                    canvas.drawLine(0, getHeight() / 2.0f, getWidth(), getHeight() / 2.0f, linePaint);
-                }
+                if (lastOutsideStatus == -1) // So if last one was below 0 too, then we simply draw the last one's line to the end(padded)
+                    drawMomentLine(canvas, i-1, padding, getWidth()-padding);
+
                 break;
             }
-            else if (posX + momentRadius < 0) { // Below 0
+            // Moment is below 0
+            else if (posX + momentRadius < padding) {
                 lastOutsideStatus = -1;
                 if (i < moments.size()-1)
                     posX = calcPosX(moments.get(i + 1));
                 else {
-                    // Draw a line of the last moment's color if it is indeed the LAST MOMENT.
-                    linePaint.setColor(moments.get(i).color);
-                    canvas.drawLine(0, getHeight() / 2.0f, getWidth(), getHeight() / 2.0f, linePaint);
+                    // Draw a full line of the last moment's color if it is indeed the LAST MOMENT(padded).
+                    drawMomentLine(canvas, i, padding, getWidth()-padding);
                 }
             }
-            else { // Inside
-                // If the last one was below 0 draw it's line
+            // Moment is in the visible area
+            else {
+                // If the last moment was below 0 draw it's line to the current one, and do other shit.
                 if (lastOutsideStatus == -1) {
-                    firstVisibleMoment = i; // This is the first visible!
+                    firstVisibleMoment = i;
                     lastOutsideStatus = 0;
-                    linePaint.setColor(moments.get(i - 1).color);
-                    canvas.drawLine(0, getHeight() / 2.0f, posX, getHeight() / 2.0f, linePaint);
+                    drawMomentLine(canvas, i-1, padding, posX);
                 }
 
-                // If this is the last one draw a line with this one's color to the end.
+                // If this is the last one draw a line with this one's color to the end of the visible area.
                 if (i == moments.size()-1 && posX - momentRadius < getWidth()) {
-                    linePaint.setColor(moments.get(i).color);
-                    canvas.drawLine(posX, getHeight() / 2.0f, getWidth(), getHeight() / 2.0f, linePaint);
+                    drawMomentLine(canvas, i, Math.max(padding, posX), getWidth() - padding);
                 }
 
                 posX = drawMoment(canvas, i, posX);
