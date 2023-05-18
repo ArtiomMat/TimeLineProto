@@ -2,8 +2,10 @@ package com.artiom.timelineproto;
 
 import android.annotation.SuppressLint;
 import android.content.Context;
+import android.content.res.TypedArray;
 import android.graphics.Canvas;
 import android.graphics.Paint;
+import android.graphics.drawable.Drawable;
 import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
@@ -89,6 +91,8 @@ public class Timeline extends View {
 
 
     private final ArrayList<Moment> moments;
+    private final Drawable[] tagDrawables; // TODO: Maybe make it static?
+
     private final Paint linePaint, momentPaint;
 
     public static int inactiveTimelineColor = 0;
@@ -97,6 +101,8 @@ public class Timeline extends View {
 
     public static int padding = 30; // In DP
 
+    public float displayDensity = getResources().getDisplayMetrics().density;
+
     // NOTE: We need the MainActivity context
     public Timeline(Context context, View parentView) {
         super(context);
@@ -104,16 +110,23 @@ public class Timeline extends View {
         this.moments = new ArrayList<>();
 
         // Setup stuff that is in DP:
-        float density = getResources().getDisplayMetrics().density;
-        timelineStroke *= density;
-        momentRadius *= density;
-        momentTouchRadius *= density;
-        padding *= density;
+        timelineStroke *= displayDensity;
+        momentRadius *= displayDensity;
+        momentTouchRadius *= displayDensity;
+        padding *= displayDensity;
 
+        // Load tag drawables
+        TypedArray tagIconsArray = getResources().obtainTypedArray(R.array.tag_icons_array);
+        tagDrawables = new Drawable[tagIconsArray.length()];
+        for (int i = 0; i < tagDrawables.length; i++)
+            tagDrawables[i] = tagIconsArray.getDrawable(i);
+        tagIconsArray.recycle();
+
+        // linePaint
         linePaint = new Paint();
         linePaint.setStyle(Paint.Style.STROKE);
         linePaint.setStrokeWidth(timelineStroke);
-
+        // momentPaint
         momentPaint = new Paint();
         momentPaint.setStyle(Paint.Style.FILL);
 
@@ -177,7 +190,11 @@ public class Timeline extends View {
     }
 
     public void addMoment(int t, int tags, int color) {
-        moments.add(new Moment(t, tags, color));
+        Moment m = new Moment(t, tags, color);
+        moments.add(m);
+        for (int i = 0; i < m.tags.length; i++) {
+            m.tags[i] = (byte) (Math.random()*tagDrawables.length);
+        }
         sortMomentToFirst(moments.size()-1);
     }
 
@@ -192,6 +209,7 @@ public class Timeline extends View {
 
     private int touchedMomentIndex = -1;
     private int touchedMomentPreT = -1;
+    private Drawable touchTagDrawable;
     @Override
     public boolean onTouchEvent(MotionEvent event) {
         int action = event.getAction();
@@ -211,6 +229,11 @@ public class Timeline extends View {
                     if (touchX < momentX + momentTouchRadius && touchX > momentX - momentTouchRadius) {
                         touchedMomentIndex = i;
                         touchedMomentPreT = moments.get(i).t; // Save the moment time
+
+                        // Setup the drawable
+                        touchTagDrawable = tagDrawables[moments.get(i).tags[0]];
+                        touchTagDrawable.setTint(moments.get(touchedMomentIndex).color);
+
                         break;
                     }
                 }
@@ -237,6 +260,13 @@ public class Timeline extends View {
                 else if (touchedMomentIndex < moments.size() - 1 && newT > moments.get(touchedMomentIndex + 1).t)
                     replaceMomentWithPrev(++touchedMomentIndex);
 
+                // Update the drawable
+                int size = (int) momentRadius*3;
+                int x = (int) (touchX-size/2.0f);
+                // TODO: Round the X, so it snaps together with the moment. Right now it's smooth at small scales.
+                int y = (int) (getHeight() / 2 - size - momentRadius);
+                touchTagDrawable.setBounds(x, y, (int) (size+x), size+y);
+
                 invalidate();
                 break;
             }
@@ -253,15 +283,16 @@ public class Timeline extends View {
                         Toast.makeText(getContext(), "Moment overlap!", Toast.LENGTH_SHORT).show();
 
                         moments.get(touchedMomentIndex).t = touchedMomentPreT;
+
                     }
 
                     sortMoments(touchedMomentIndex);
+                    touchedMomentIndex = -1;
+                    touchTagDrawable = null;
+                    invalidate();
                 }
 
-
-                touchedMomentIndex = -1;
                 performClick();
-                invalidate();
                 break;
 
             default:
@@ -329,6 +360,10 @@ public class Timeline extends View {
     @Override
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
+
+        // First of all, draw the tag Drawable if it isn't null.
+        if (touchTagDrawable != null)
+            touchTagDrawable.draw(canvas);
 
         firstVisibleMoment = -1;
         lastVisibleMoment = moments.size() - 1;

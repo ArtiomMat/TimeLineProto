@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <array name="tag_icons_array">
+        <item>@drawable/sad</item>
+        <item>@drawable/happy</item>
+        <item>@drawable/brain</item>
+        <item>@drawable/vibes</item>
+    </array>
+</resources>
